@@ -95,6 +95,8 @@ def run(args):
         difficulty=args.difficulty,
         follow_ups=not args.no_followups,
         include_web=args.web,
+        include_tailored=args.with_tailored,
+        tailored_only=args.tailored,
         seed=args.seed,
     )
     interview = Interview(llm, cfg)
@@ -102,6 +104,13 @@ def run(args):
     if args.web:
         n_web = len(qbank.load_harvested())
         console.print(f"[dim]Including {n_web} web-harvested questions in the pool.[/dim]\n")
+    if args.tailored or args.with_tailored:
+        n_t = len(qbank.load_tailored())
+        if n_t == 0:
+            console.print("[yellow]No tailored questions found. Generate them first: "
+                          "python -m interviewer.jd_generator --jd jd.txt[/yellow]\n")
+        else:
+            console.print(f"[dim]Using {n_t} JD/resume-tailored questions.[/dim]\n")
 
     for i, q in enumerate(selected, 1):
         console.print(Rule(f"Question {i}/{len(selected)}  ·  {q['category']} · {q['difficulty']}"))
@@ -182,6 +191,8 @@ def main():
     ap.add_argument("--category", help="restrict to one category (e.g. RAG, Agents, Coding)")
     ap.add_argument("--difficulty", choices=["easy", "medium", "hard"], help="restrict difficulty")
     ap.add_argument("--web", action="store_true", help="include web-harvested real questions")
+    ap.add_argument("--tailored", action="store_true", help="use ONLY JD/resume-tailored questions")
+    ap.add_argument("--with-tailored", action="store_true", help="mix tailored questions into the pool")
     ap.add_argument("--no-followups", action="store_true", help="disable adaptive follow-ups")
     ap.add_argument("--voice", action="store_true", help="speak questions (macOS 'say')")
     ap.add_argument("--seed", type=int, help="deterministic question selection")

@@ -118,6 +118,41 @@ def test_all_questions_includes_web_flag():
     assert len(curated) == len(q.QUESTIONS)
 
 
+def test_jd_generator_clean_shapes_and_filters():
+    from interviewer.jd_generator import _clean
+    raw = [
+        {"question": "Walk me through your RAG chunking decision and why.",
+         "category": "RAG", "difficulty": "hard",
+         "targets": "resume RAG project", "rubric": ["chunk size", "overlap", "eval"]},
+        {"question": "hi", "rubric": ["x"]},  # too short -> dropped
+        "not a dict",                          # ignored
+    ]
+    out = _clean(raw, "jd")
+    assert len(out) == 1
+    assert out[0]["source"] == "tailored"
+    assert out[0]["difficulty"] == "hard"
+    assert out[0]["id"].startswith("jd-")
+
+
+def test_jd_generator_uses_fake_llm():
+    from interviewer.jd_generator import generate
+
+    class FakeGenLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, system, user, temperature=0.5, retries=2):
+            return {"questions": [
+                {"question": "Explain the tradeoffs in your model router design.",
+                 "category": "System Design", "difficulty": "hard",
+                 "rubric": ["difficulty scoring", "cost vs quality", "measurement"]},
+            ]}
+
+    out = generate("Some JD requiring RAG and routing", "resume text",
+                   n=3, llm=FakeGenLLM())
+    assert len(out) == 1
+    assert out[0]["category"] == "System Design"
+    assert len(out[0]["rubric"]) >= 3
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

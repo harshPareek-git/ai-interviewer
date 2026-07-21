@@ -28,6 +28,8 @@ class InterviewConfig:
     role: str = "AI Engineer / Forward Deployed Engineer"
     follow_ups: bool = True
     include_web: bool = False   # merge web-harvested questions
+    include_tailored: bool = False  # merge JD/resume-tailored questions
+    tailored_only: bool = False     # use ONLY tailored questions
     seed: Optional[int] = None
 
 
@@ -40,7 +42,14 @@ class Interview:
         self._rng = random.Random(config.seed)
 
     def select_questions(self) -> List[Dict]:
-        pool = list(qbank.all_questions(include_web=self.cfg.include_web))
+        if self.cfg.tailored_only:
+            pool = list(qbank.load_tailored())
+            if not pool:
+                pool = list(qbank.all_questions(include_web=self.cfg.include_web))
+        else:
+            pool = list(qbank.all_questions(
+                include_web=self.cfg.include_web,
+                include_tailored=self.cfg.include_tailored))
         if self.cfg.categories:
             pool = [q for q in pool if q["category"] in self.cfg.categories]
         if self.cfg.difficulty:

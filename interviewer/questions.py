@@ -224,11 +224,43 @@ def load_harvested():
     return out
 
 
-def all_questions(include_web: bool = False):
-    """Return curated questions, optionally merged with harvested web questions."""
-    if not include_web:
-        return list(QUESTIONS)
-    return list(QUESTIONS) + load_harvested()
+def all_questions(include_web: bool = False, include_tailored: bool = False):
+    """Return curated questions, optionally merged with harvested/tailored questions."""
+    pool = list(QUESTIONS)
+    if include_web:
+        pool += load_harvested()
+    if include_tailored:
+        pool += load_tailored()
+    return pool
+
+
+def load_tailored():
+    """Load JD/resume-tailored questions from data/tailored_questions.json."""
+    import json
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "tailored_questions.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path) as f:
+            qs = json.load(f).get("questions", [])
+    except Exception:
+        return []
+    out = []
+    for q in qs:
+        if not q.get("question") or not q.get("rubric"):
+            continue
+        out.append({
+            "id": q.get("id", "jd"),
+            "category": q.get("category", "System Design"),
+            "difficulty": q.get("difficulty", "medium"),
+            "type": q.get("type", "technical"),
+            "question": q["question"],
+            "rubric": q["rubric"],
+            "source": q.get("source", "tailored"),
+        })
+    return out
 
 
 def categories(include_web: bool = False):

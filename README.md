@@ -49,7 +49,6 @@ python -m interviewer.progress
 ```
 
 ### Web harvester
-
 ```bash
 # default India-focused searches (AmbitionBox, Glassdoor India, 2026 guides)
 python -m interviewer.harvester --max-pages 8
@@ -65,6 +64,27 @@ python -m interviewer.harvester --fresh
 Harvested questions are saved to `data/harvested_questions.json` (deduped, with
 auto-generated rubrics and source URLs) and merged into the interview when you
 pass `--web`.
+
+### JD- and resume-aware questions
+
+Generate questions tailored to a specific job description and your resume. These
+drill into the exact projects/claims on your resume and the skills the JD
+demands, which is exactly how real interviewers test whether your experience is
+as deep as you claim.
+
+```bash
+# from files
+python -m interviewer.jd_generator --jd jd.txt --resume resume.txt --n 8
+
+# inline
+python -m interviewer.jd_generator --jd-text "Forward Deployed AI Engineer, RAG, agents..." --n 6
+
+# then practice ONLY those tailored questions
+python -m interviewer.cli --tailored
+
+# or mix them into a normal mock
+python -m interviewer.cli --with-tailored --web
+```
 
 Answer prompts are multi-line: type your answer, then an empty line + Enter to
 submit. Type `skip` to skip a question.

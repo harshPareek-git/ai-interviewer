@@ -6,3 +6,4 @@ venv/
 .DS_Store
 sessions/*.json
 data/harvested_questions.json
+data/tailored_questions.json
