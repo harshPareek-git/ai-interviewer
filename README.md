@@ -148,33 +148,56 @@ INTERVIEWER_BACKEND=openai INTERVIEWER_MODEL=gpt-4o-mini python -m interviewer.c
 
 ```mermaid
 flowchart TD
-    Q[Question bank + rubrics] --> E[Interview engine]
+    QB[Curated question bank + rubrics] --> E[Interview engine]
+    HW[Web harvester -> real questions] --> E
+    JD[JD/resume generator -> tailored questions] --> E
     E -->|ask| U[You answer in the CLI]
     U --> V[Rubric evaluator -> LLM-as-judge]
-    V -->|score + follow-up| E
+    V -->|score + gaps| E
+    V --> PR[Depth prober -> deeper follow-ups]
+    PR -->|drill down| U
     E --> R[Session report + saved JSON]
-    R --> P[Progress tracker across sessions]
+    R --> P[Progress tracker]
+    R --> SS[Study-sheet export]
+    STAR[STAR behavioral coach] --> R
     LLM[(Ollama / OpenAI)] --- V
+    LLM --- PR
+    LLM --- HW
+    LLM --- JD
 ```
 
-- `interviewer/questions.py` — curated question bank, each with a scoring rubric.
 - `interviewer/llm.py` — model client (Ollama default; OpenAI optional) with a
-  robust JSON extractor for structured evaluation from small local models.
-- `interviewer/evaluator.py` — rubric-based LLM-as-judge with score clamping and
-  graceful fallbacks.
-- `interviewer/engine.py` — question selection, follow-up logic, report aggregation.
+  robust JSON extractor + native `format=json` for reliable structured output.
+- `interviewer/questions.py` — curated question bank + loaders that merge
+  web-harvested and JD-tailored questions.
+- `interviewer/evaluator.py` — rubric-based LLM-as-judge (score, covered/missed,
+  factual errors, model answer) with clamping, non-answer handling, and fallbacks.
+- `interviewer/prober.py` — depth-probing follow-up generator (drills into your
+  actual answer, several levels deep).
+- `interviewer/engine.py` — question selection, probe orchestration, reporting.
 - `interviewer/cli.py` — interactive terminal UI (rich) + session persistence.
+- `interviewer/harvester.py` — web scraper: search + fetch + LLM extraction of
+  real interview questions with auto-rubrics (India-focused seeds + fallback).
+- `interviewer/jd_generator.py` — JD/resume-aware tailored question generator.
+- `interviewer/star_coach.py` + `interviewer/star.py` — STAR behavioral coach.
+- `interviewer/studysheet.py` — revision cheat-sheet export.
 - `interviewer/progress.py` — cross-session analytics and trend.
-- `tests/` — 9 offline tests (mock LLM, no Ollama needed).
+- `tests/` — 18 offline tests (mock LLM, no Ollama needed).
 
 ## Tests
 
 ```bash
-python tests/test_interviewer.py     # 9/9, runs offline
+python tests/test_interviewer.py     # 18/18, runs offline
 ```
+
+## Known issues & workarounds
+
+See [`FALLBACKS.md`](FALLBACKS.md) for the full log of problems hit while building
+this (search rate-limiting, small-model JSON reliability, crash-safe harvesting,
+etc.) and how each was resolved.
 
 ## Roadmap
 - Voice answers (speech-to-text) for a fully spoken mock interview
-- Resume-aware questions (paste your resume, get tailored probing)
 - Company-specific question packs
-- Timed mode + "thinking out loud" coaching
+- Timed / pressure mode with per-question countdown
+- Spaced repetition across sessions for weakest topics
