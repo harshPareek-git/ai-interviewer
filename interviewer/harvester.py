@@ -41,6 +41,23 @@ DEFAULT_QUERIES = [
     "GenAI engineer interview questions India experienced",
 ]
 
+# Curated, reachable seed pages (India-focused + strong 2026 AI-eng guides).
+# Used as a fallback when live search is rate-limited/blocked, so a good batch
+# is always harvestable.
+SEED_URLS = [
+    "https://www.ambitionbox.com/profiles/artificial-intelligence-engineer/interview-questions",
+    "https://www.ambitionbox.com/profiles/ai-engineer/interview-questions?page=2",
+    "https://www.ambitionbox.com/profiles/machine-learning-engineer/interview-questions",
+    "https://www.ambitionbox.com/profiles/data-scientist/interview-questions",
+    "https://www.ambitionbox.com/profiles/data-scientist/interview-questions?page=2",
+    "https://www.ambitionbox.com/profiles/nlp-engineer/interview-questions",
+    "https://www.simplilearn.com/tutorials/machine-learning-tutorial/machine-learning-interview-questions",
+    "https://www.geeksforgeeks.org/machine-learning-interview-questions/",
+    "https://www.turing.com/interview-questions/machine-learning",
+    "https://www.datacamp.com/blog/top-machine-learning-interview-questions",
+    "https://letsdatascience.com/blog/50-llm-and-ai-engineer-interview-questions-for-2026",
+]
+
 
 # --------------------------------------------------------------------------
 # networking
@@ -185,8 +202,14 @@ def save(questions: List[Dict], sources: List[str]):
                    "questions": questions}, f, indent=2)
 
 
+def _assign_ids_and_save(questions: List[Dict], sources: List[str]):
+    for idx, q in enumerate(questions):
+        q.setdefault("id", f"web-{idx+1}")
+    save(questions, sources)
+
+
 def harvest(queries: List[str], max_pages: int, per_page: int,
-            append: bool = True) -> Dict:
+            append: bool = True, use_seeds: bool = True) -> Dict:
     llm = LLM()
     print(f"Harvesting interview questions  (model={llm.model})")
     existing = load_existing() if append else []
@@ -194,21 +217,51 @@ def harvest(queries: List[str], max_pages: int, per_page: int,
     collected = list(existing)
     sources: List[str] = []
 
+    # 1. try live search
     urls: List[str] = []
     for q in queries:
         print(f"• search: {q}")
         for u in ddg_search(q, max_results=4):
             if u not in urls:
                 urls.append(u)
+
+    # 2. fall back to curated seeds if search is blocked/thin
+    if use_seeds:
+        before = len(urls)
+        for u in SEED_URLS:
+            if u not in urls:
+                urls.append(u)
+        if len(urls) > before and before == 0:
+            print("  (live search returned nothing; using curated seed URLs)")
+
     urls = urls[:max_pages]
     print(f"  -> {len(urls)} pages to scan")
 
+    # stats
+    pages_scanned = 0
+    pages_failed = 0
+    raw_extracted = 0
+
     for i, url in enumerate(urls, 1):
         print(f"[{i}/{len(urls)}] {url}")
-        text = fetch_text(url)
-        if not text:
+        try:
+            text = fetch_text(url)
+        except Exception as e:
+            print(f"    ! fetch error: {e}")
+            pages_failed += 1
             continue
-        qs = extract_questions(llm, text, k=per_page)
+        if not text:
+            pages_failed += 1
+            continue
+        pages_scanned += 1
+        try:
+            qs = extract_questions(llm, text, k=per_page)
+        except Exception as e:
+            # a model/backend hiccup shouldn't lose everything harvested so far
+            print(f"    ! extract error: {e} (saving progress, continuing)")
+            _assign_ids_and_save(collected, sources)
+            continue
+        raw_extracted += len(qs)
         added = 0
         for q in qs:
             key = _norm(q["question"])
@@ -220,14 +273,34 @@ def harvest(queries: List[str], max_pages: int, per_page: int,
             added += 1
         if added:
             sources.append(url)
-        print(f"    +{added} new questions (total {len(collected)})")
+        # incremental save after every page so a crash never loses progress
+        _assign_ids_and_save(collected, sources)
+        print(f"    extracted {len(qs)}, +{added} new (total {len(collected)})")
 
-    # assign stable ids
-    for idx, q in enumerate(collected):
-        q.setdefault("id", f"web-{idx+1}")
-    save(collected, sources)
-    print(f"\nSaved {len(collected)} questions to {os.path.relpath(OUT_PATH)}")
-    return {"total": len(collected), "new_sources": sources}
+    _assign_ids_and_save(collected, sources)
+
+    new_this_run = len(collected) - len(existing)
+    dup_dropped = raw_extracted - new_this_run
+    scrape_rate = (100.0 * new_this_run / raw_extracted) if raw_extracted else 0.0
+    stats = {
+        "pages_offered": len(urls),
+        "pages_scanned": pages_scanned,
+        "pages_failed": pages_failed,
+        "raw_extracted": raw_extracted,
+        "new_unique_kept": new_this_run,
+        "duplicates_dropped": max(0, dup_dropped),
+        "scrape_keep_rate_pct": round(scrape_rate, 1),
+        "total_in_bank": len(collected),
+    }
+    print("\n=== Harvest summary ===")
+    print(f"  pages scanned          : {pages_scanned}/{len(urls)} (failed {pages_failed})")
+    print(f"  raw questions extracted: {raw_extracted}")
+    print(f"  new unique kept        : {new_this_run}")
+    print(f"  duplicates dropped     : {stats['duplicates_dropped']}")
+    print(f"  keep rate              : {stats['scrape_keep_rate_pct']}%  (unique kept / raw extracted)")
+    print(f"  TOTAL in question bank : {len(collected)}")
+    print(f"\nSaved to {os.path.relpath(OUT_PATH)}")
+    return stats
 
 
 def main():
@@ -236,9 +309,11 @@ def main():
     ap.add_argument("--max-pages", type=int, default=6, help="max pages to scan")
     ap.add_argument("--per-page", type=int, default=8, help="max questions per page")
     ap.add_argument("--fresh", action="store_true", help="ignore existing harvested file")
+    ap.add_argument("--no-seeds", action="store_true", help="do not use curated seed URLs")
     args = ap.parse_args()
     queries = args.query if args.query else DEFAULT_QUERIES
-    harvest(queries, args.max_pages, args.per_page, append=not args.fresh)
+    harvest(queries, args.max_pages, args.per_page,
+            append=not args.fresh, use_seeds=not args.no_seeds)
 
 
 if __name__ == "__main__":
