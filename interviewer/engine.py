@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from .evaluator import Evaluator
 from .llm import LLM
+from .prober import Prober
 from . import questions as qbank
 
 
@@ -27,6 +28,7 @@ class InterviewConfig:
     difficulty: Optional[str] = None        # None = mixed
     role: str = "AI Engineer / Forward Deployed Engineer"
     follow_ups: bool = True
+    probe_depth: int = 2       # max depth-probing follow-ups per question
     include_web: bool = False   # merge web-harvested questions
     include_tailored: bool = False  # merge JD/resume-tailored questions
     tailored_only: bool = False     # use ONLY tailored questions
@@ -38,6 +40,7 @@ class Interview:
         self.llm = llm
         self.cfg = config
         self.evaluator = Evaluator(llm)
+        self.prober = Prober(llm, max_depth=config.probe_depth)
         self.turns: List[Turn] = []
         self._rng = random.Random(config.seed)
 

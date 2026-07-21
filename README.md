@@ -20,8 +20,10 @@ free. Built to prep for real interviews in a couple of weeks.
   production, and client-facing (FDE) behavioral scenarios.
 - **Evaluates** each answer against an expert rubric and returns a 0-10 score,
   what you covered, what you missed, factual errors, and a tight model answer.
-- **Follows up** adaptively: if your answer is decent, it probes deeper, exactly
-  like a real interviewer testing the edge of your knowledge.
+- **Follows up** adaptively with **depth-probing chains**: it reads your actual
+  answer, targets the vaguest or least-supported part, and keeps drilling ("but
+  why?", "what breaks at scale?", "how did you measure that?") several levels
+  deep, exactly like a real interviewer finding the edge of your knowledge.
 - **Reports** an overall verdict, per-category scores, and your biggest gaps.
 - **Tracks progress** across every session so you can watch yourself improve.
 
@@ -114,6 +116,7 @@ INTERVIEWER_BACKEND=openai INTERVIEWER_MODEL=gpt-4o-mini python -m interviewer.c
 | `--category C` | restrict to one category (LLM Fundamentals, RAG, Agents, Evaluation, System Design, Forward Deployed, Coding) |
 | `--difficulty D` | easy / medium / hard |
 | `--no-followups` | disable adaptive follow-up questions |
+| `--probe-depth N` | depth-probing follow-ups per question (default 2) |
 | `--voice` | speak the questions aloud (macOS `say`) |
 | `--seed N` | deterministic question selection |
 

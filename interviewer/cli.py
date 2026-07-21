@@ -94,6 +94,7 @@ def run(args):
         categories=[args.category] if args.category else None,
         difficulty=args.difficulty,
         follow_ups=not args.no_followups,
+        probe_depth=(0 if args.no_followups else args.probe_depth),
         include_web=args.web,
         include_tailored=args.with_tailored,
         tailored_only=args.tailored,
@@ -122,17 +123,29 @@ def run(args):
         interview.record(q, answer, ev)
         show_evaluation(ev)
 
-        # adaptive follow-up if warranted and answer was reasonable
-        if cfg.follow_ups and ev.get("follow_up") and ev.get("score", 0) >= 4 and answer:
-            fq = interview.make_follow_up_question(q, ev["follow_up"])
-            console.print(f"\n[italic magenta]Follow-up:[/italic magenta] [bold]{fq['question']}[/bold]\n")
-            speak(fq["question"], args.voice)
-            fa = read_multiline("Your answer")
-            if fa:
+        # depth-probing follow-up CHAIN: keep drilling into the answer
+        if cfg.follow_ups and answer:
+            probe_history = []  # prior probe exchanges (excludes original Q)
+            last_answer, last_eval = answer, ev
+            while len(probe_history) < cfg.probe_depth:
+                probe = interview.prober.next_probe(q, probe_history, last_answer, last_eval)
+                if not probe:
+                    break
+                label = f"Probe {len(probe_history)+1}"
+                if probe.get("targets"):
+                    label += f"  ·  tests: {probe['targets']}"
+                console.print(f"\n[italic magenta]{label}[/italic magenta]")
+                console.print(f"[bold]{probe['question']}[/bold]\n")
+                speak(probe["question"], args.voice)
+                pa = read_multiline("Your answer")
+                if not pa:
+                    break
                 console.print("[dim]Evaluating...[/dim]")
-                fev = interview.evaluate_answer(fq, fa)
-                interview.record(fq, fa, fev, is_follow_up=True)
-                show_evaluation(fev)
+                pev = interview.evaluate_answer(probe, pa)
+                interview.record(probe, pa, pev, is_follow_up=True)
+                show_evaluation(pev)
+                probe_history.append({"q": probe["question"], "a": pa})
+                last_answer, last_eval = pa, pev
         console.print()
 
     show_report(interview)
@@ -194,6 +207,8 @@ def main():
     ap.add_argument("--tailored", action="store_true", help="use ONLY JD/resume-tailored questions")
     ap.add_argument("--with-tailored", action="store_true", help="mix tailored questions into the pool")
     ap.add_argument("--no-followups", action="store_true", help="disable adaptive follow-ups")
+    ap.add_argument("--probe-depth", type=int, default=2,
+                    help="how many depth-probing follow-ups per question (default 2)")
     ap.add_argument("--voice", action="store_true", help="speak questions (macOS 'say')")
     ap.add_argument("--seed", type=int, help="deterministic question selection")
     args = ap.parse_args()

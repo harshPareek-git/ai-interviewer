@@ -153,6 +153,42 @@ def test_jd_generator_uses_fake_llm():
     assert len(out[0]["rubric"]) >= 3
 
 
+def test_prober_chains_and_respects_depth():
+    from interviewer.prober import Prober
+
+    class FakeProbeLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, system, user, temperature=0.4, retries=2):
+            return {"follow_up": "Why cosine and not euclidean?",
+                    "targets": "metric choice", "stop": False}
+
+    q = {"id": "rag-1", "category": "RAG", "difficulty": "medium",
+         "type": "technical", "question": "Design RAG.", "rubric": ["a", "b"]}
+    p = Prober(FakeProbeLLM(), max_depth=2)
+
+    r1 = p.next_probe(q, [], "I use cosine similarity.", {"missed": ["reranking"]})
+    assert r1 and r1["is_probe"] and r1["id"].startswith("rag-1-probe")
+    # at/over max depth -> stop
+    r_over = p.next_probe(q, [{"q": "a", "a": "b"}, {"q": "c", "a": "d"}], "x", {})
+    assert r_over is None
+
+
+def test_prober_stops_on_nonanswer_and_stop_flag():
+    from interviewer.prober import Prober
+
+    class StopLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, system, user, temperature=0.4, retries=2):
+            return {"follow_up": "x", "stop": True}
+
+    q = {"id": "q1", "category": "RAG", "difficulty": "easy",
+         "type": "technical", "question": "?", "rubric": ["a"]}
+    # non-answer -> no probe regardless of model
+    assert Prober(StopLLM()).next_probe(q, [], "idk", {}) is None
+    # stop flag -> no probe
+    assert Prober(StopLLM()).next_probe(q, [], "a real answer here", {}) is None
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
