@@ -149,4 +149,21 @@ interactive interview, launched it in a real Terminal window via AppleScript
 
 ---
 
+## 11. Behavioral sessions didn't feed progress / study-sheet
+
+**Symptom.** STAR behavioral rounds saved as `behavioral_*.json`, but the
+progress tracker and study-sheet exporter only globbed `session_*.json`, so
+behavioral practice never appeared in analytics. The behavioral turn schema also
+differs (score/feedback nested under `eval`, no top-level `category`).
+
+**Cause.** The two mock modes evolved separate save schemas; the readers were
+written for the technical schema only.
+
+**Fix.** Both `progress.py` and `studysheet.py` now also load
+`behavioral_*.json`, normalizing each turn to the shared schema
+(`category="Behavioral"`, flatten `eval.score`/`eval.missing`/`improved_answer`).
+Added a regression test (`test_studysheet_normalizes_behavioral_sessions`).
+
+---
+
 _Last updated: 2026-07-21._

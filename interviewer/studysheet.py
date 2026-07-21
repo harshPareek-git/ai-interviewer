@@ -46,12 +46,31 @@ teach these missing points. Return ONLY JSON: {{"notes": ["...", "..."]}}"""
 
 def load_sessions() -> List[Dict]:
     out = []
+    # technical mock sessions
     for f in sorted(glob.glob(os.path.join(SESS_DIR, "session_*.json"))):
         try:
             with open(f) as fh:
                 out.append(json.load(fh))
         except Exception:
             continue
+    # behavioral (STAR) sessions -> normalize to the technical turn schema
+    for f in sorted(glob.glob(os.path.join(SESS_DIR, "behavioral_*.json"))):
+        try:
+            with open(f) as fh:
+                s = json.load(fh)
+        except Exception:
+            continue
+        turns = []
+        for t in s.get("turns", []):
+            ev = t.get("eval", {})
+            turns.append({
+                "category": "Behavioral",
+                "score": ev.get("score"),
+                "missed": ev.get("missing", []),
+                "ideal_answer": ev.get("improved_answer", ""),
+                "question": t.get("question", ""),
+            })
+        out.append({"timestamp": s.get("timestamp"), "report": {}, "turns": turns})
     return out
 
 

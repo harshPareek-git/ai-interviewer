@@ -233,6 +233,34 @@ def test_studysheet_aggregate():
     assert any(c == "RAG" for _, c, _, _ in weak)  # score<6 turn captured
 
 
+def test_studysheet_normalizes_behavioral_sessions(tmp_path=None):
+    import json
+    import os
+    import tempfile
+    import importlib
+    from interviewer import studysheet
+
+    with tempfile.TemporaryDirectory() as d:
+        beh = {"timestamp": "20260101_000000", "mode": "behavioral", "turns": [
+            {"question": "Tell me about a failure.",
+             "answer": "we messed up",
+             "eval": {"score": 3, "missing": ["Result"], "improved_answer": "..."}},
+        ]}
+        with open(os.path.join(d, "behavioral_x.json"), "w") as f:
+            json.dump(beh, f)
+        old = studysheet.SESS_DIR
+        studysheet.SESS_DIR = d
+        try:
+            sessions = studysheet.load_sessions()
+        finally:
+            studysheet.SESS_DIR = old
+        assert len(sessions) == 1
+        t = sessions[0]["turns"][0]
+        assert t["category"] == "Behavioral"
+        assert t["score"] == 3
+        assert "Result" in t["missed"]
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

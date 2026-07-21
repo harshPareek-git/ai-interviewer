@@ -21,14 +21,34 @@ console = Console()
 
 
 def load_sessions():
-    files = sorted(glob.glob(os.path.join(SESS_DIR, "session_*.json")))
     out = []
-    for f in files:
+    for f in sorted(glob.glob(os.path.join(SESS_DIR, "session_*.json"))):
         try:
             with open(f) as fh:
                 out.append(json.load(fh))
         except Exception:
             continue
+    # behavioral (STAR) sessions: synthesize a comparable report block
+    for f in sorted(glob.glob(os.path.join(SESS_DIR, "behavioral_*.json"))):
+        try:
+            with open(f) as fh:
+                s = json.load(fh)
+        except Exception:
+            continue
+        scores = [t.get("eval", {}).get("score") for t in s.get("turns", [])]
+        scores = [x for x in scores if isinstance(x, (int, float))]
+        overall = round(sum(scores) / len(scores), 1) if scores else 0
+        turns = [{"category": "Behavioral",
+                  "score": t.get("eval", {}).get("score"),
+                  "missed": t.get("eval", {}).get("missing", [])}
+                 for t in s.get("turns", [])]
+        out.append({
+            "timestamp": s.get("timestamp", "?"),
+            "report": {"overall": overall, "verdict": "behavioral round",
+                       "category_scores": {"Behavioral": overall}},
+            "turns": turns,
+        })
+    out.sort(key=lambda x: x.get("timestamp", ""))
     return out
 
 
