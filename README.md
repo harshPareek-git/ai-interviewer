@@ -12,6 +12,9 @@ free. Built to prep for real interviews in a couple of weeks.
 
 ## What it does
 
+- **Harvests real questions from the web** — scans India-focused sources
+  (AmbitionBox, Glassdoor India) and 2026 AI-eng guides, uses the LLM to extract
+  actual asked questions and auto-generate rubrics, then feeds them into the mock.
 - **Asks** curated questions across the topics that AI Eng / FDE interviews
   actually cover: LLM fundamentals, RAG, agents, evaluation, system design,
   production, and client-facing (FDE) behavioral scenarios.
@@ -31,16 +34,37 @@ pip install -r requirements.txt
 ollama serve
 ollama pull llama3.2          # works out of the box
 
-# run a mock interview
-python -m interviewer.cli
+# 1. harvest real interview questions from the web (India-focused)
+python -m interviewer.harvester --max-pages 6
 
-# focus a weak area
+# 2. run a mock interview that includes those real questions
+python -m interviewer.cli --web
+
+# focus a weak area / difficulty
 python -m interviewer.cli --category RAG --n 4
 python -m interviewer.cli --difficulty hard
 
 # see your progress across all past sessions
 python -m interviewer.progress
 ```
+
+### Web harvester
+
+```bash
+# default India-focused searches (AmbitionBox, Glassdoor India, 2026 guides)
+python -m interviewer.harvester --max-pages 8
+
+# custom, targeted searches
+python -m interviewer.harvester --query "Forward Deployed Engineer interview India" \
+                                --query "Palantir FDE interview questions"
+
+# start a fresh bank instead of appending
+python -m interviewer.harvester --fresh
+```
+
+Harvested questions are saved to `data/harvested_questions.json` (deduped, with
+auto-generated rubrics and source URLs) and merged into the interview when you
+pass `--web`.
 
 Answer prompts are multi-line: type your answer, then an empty line + Enter to
 submit. Type `skip` to skip a question.

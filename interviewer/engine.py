@@ -27,6 +27,7 @@ class InterviewConfig:
     difficulty: Optional[str] = None        # None = mixed
     role: str = "AI Engineer / Forward Deployed Engineer"
     follow_ups: bool = True
+    include_web: bool = False   # merge web-harvested questions
     seed: Optional[int] = None
 
 
@@ -39,13 +40,13 @@ class Interview:
         self._rng = random.Random(config.seed)
 
     def select_questions(self) -> List[Dict]:
-        pool = list(qbank.QUESTIONS)
+        pool = list(qbank.all_questions(include_web=self.cfg.include_web))
         if self.cfg.categories:
             pool = [q for q in pool if q["category"] in self.cfg.categories]
         if self.cfg.difficulty:
             pool = [q for q in pool if q["difficulty"] == self.cfg.difficulty]
         if not pool:
-            pool = list(qbank.QUESTIONS)
+            pool = list(qbank.all_questions(include_web=self.cfg.include_web))
         self._rng.shuffle(pool)
         # spread across categories for a balanced interview
         seen, ordered = set(), []

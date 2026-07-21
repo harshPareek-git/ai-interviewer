@@ -94,10 +94,14 @@ def run(args):
         categories=[args.category] if args.category else None,
         difficulty=args.difficulty,
         follow_ups=not args.no_followups,
+        include_web=args.web,
         seed=args.seed,
     )
     interview = Interview(llm, cfg)
     selected = interview.select_questions()
+    if args.web:
+        n_web = len(qbank.load_harvested())
+        console.print(f"[dim]Including {n_web} web-harvested questions in the pool.[/dim]\n")
 
     for i, q in enumerate(selected, 1):
         console.print(Rule(f"Question {i}/{len(selected)}  ·  {q['category']} · {q['difficulty']}"))
@@ -175,8 +179,9 @@ def save_session(interview: Interview, llm: LLM):
 def main():
     ap = argparse.ArgumentParser(description="AI Engineer / FDE mock interviewer")
     ap.add_argument("--n", type=int, default=6, help="number of questions")
-    ap.add_argument("--category", choices=qbank.CATEGORIES, help="restrict to one category")
+    ap.add_argument("--category", help="restrict to one category (e.g. RAG, Agents, Coding)")
     ap.add_argument("--difficulty", choices=["easy", "medium", "hard"], help="restrict difficulty")
+    ap.add_argument("--web", action="store_true", help="include web-harvested real questions")
     ap.add_argument("--no-followups", action="store_true", help="disable adaptive follow-ups")
     ap.add_argument("--voice", action="store_true", help="speak questions (macOS 'say')")
     ap.add_argument("--seed", type=int, help="deterministic question selection")

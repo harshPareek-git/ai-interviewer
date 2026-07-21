@@ -22,11 +22,11 @@ class LLM:
         self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     def chat(self, system: str, user: str, temperature: float = 0.7,
-             max_tokens: int = 800) -> str:
+             max_tokens: int = 800, force_json: bool = False) -> str:
         if self.backend == "ollama":
-            return self._ollama(system, user, temperature, max_tokens)
+            return self._ollama(system, user, temperature, max_tokens, force_json)
         if self.backend == "openai":
-            return self._openai(system, user, temperature, max_tokens)
+            return self._openai(system, user, temperature, max_tokens, force_json)
         raise ValueError(f"unknown backend {self.backend}")
 
     def chat_json(self, system: str, user: str, temperature: float = 0.3,
@@ -38,7 +38,8 @@ class LLM:
         )
         last = ""
         for attempt in range(retries + 1):
-            raw = self.chat(sys_json, user, temperature=temperature, max_tokens=1200)
+            raw = self.chat(sys_json, user, temperature=temperature,
+                            max_tokens=1200, force_json=True)
             last = raw
             parsed = _extract_json(raw)
             if parsed is not None:
@@ -49,8 +50,9 @@ class LLM:
         return {"_parse_error": True, "_raw": last}
 
     # --- backends --------------------------------------------------------
-    def _ollama(self, system: str, user: str, temperature: float, max_tokens: int) -> str:
-        payload = json.dumps({
+    def _ollama(self, system: str, user: str, temperature: float, max_tokens: int,
+                force_json: bool = False) -> str:
+        body = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -58,7 +60,10 @@ class LLM:
             ],
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
-        }).encode()
+        }
+        if force_json:
+            body["format"] = "json"  # Ollama native constrained JSON decoding
+        payload = json.dumps(body).encode()
         req = urllib.request.Request(
             f"{self.ollama_host}/api/chat", data=payload,
             headers={"Content-Type": "application/json"},
@@ -68,16 +73,20 @@ class LLM:
         text = data.get("message", {}).get("content", "")
         return _strip_think(text).strip()
 
-    def _openai(self, system: str, user: str, temperature: float, max_tokens: int) -> str:
+    def _openai(self, system: str, user: str, temperature: float, max_tokens: int,
+                force_json: bool = False) -> str:
         from openai import OpenAI
 
         client = OpenAI()
-        r = client.chat.completions.create(
+        kwargs = dict(
             model=self.model,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
             temperature=temperature, max_tokens=max_tokens,
         )
+        if force_json:
+            kwargs["response_format"] = {"type": "json_object"}
+        r = client.chat.completions.create(**kwargs)
         return (r.choices[0].message.content or "").strip()
 
 

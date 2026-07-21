@@ -194,6 +194,47 @@ QUESTIONS = [
 CATEGORIES = sorted({q["category"] for q in QUESTIONS})
 
 
+def load_harvested():
+    """Load web-harvested questions from data/harvested_questions.json if present."""
+    import json
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "harvested_questions.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path) as f:
+            qs = json.load(f).get("questions", [])
+    except Exception:
+        return []
+    # normalize to the expected schema
+    out = []
+    for q in qs:
+        if not q.get("question") or not q.get("rubric"):
+            continue
+        out.append({
+            "id": q.get("id", "web"),
+            "category": q.get("category", "LLM Fundamentals"),
+            "difficulty": q.get("difficulty", "medium"),
+            "type": q.get("type", "technical"),
+            "question": q["question"],
+            "rubric": q["rubric"],
+            "source": q.get("source", "web"),
+        })
+    return out
+
+
+def all_questions(include_web: bool = False):
+    """Return curated questions, optionally merged with harvested web questions."""
+    if not include_web:
+        return list(QUESTIONS)
+    return list(QUESTIONS) + load_harvested()
+
+
+def categories(include_web: bool = False):
+    return sorted({q["category"] for q in all_questions(include_web)})
+
+
 def by_category(cat: str):
     return [q for q in QUESTIONS if q["category"] == cat]
 

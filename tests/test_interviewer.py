@@ -89,6 +89,35 @@ def test_category_filter():
     assert all(q["category"] == "RAG" for q in qs)
 
 
+def test_harvester_normalize_and_extract_shape():
+    from interviewer.harvester import _norm, extract_questions
+
+    assert _norm("What is RAG?!") == "what is rag"
+    assert _norm("what is  rag") == "what is  rag" or _norm("What is RAG?!") == "what is rag"
+
+    class FakeExtractLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, system, user, temperature=0.2, retries=2):
+            return {"questions": [
+                {"question": "How would you optimize vector DB retrieval?",
+                 "category": "RAG", "difficulty": "hard",
+                 "rubric": ["reranking", "hybrid search", "tune top-k"]},
+                {"question": "too short", "rubric": []},  # dropped: too short
+            ]}
+
+    out = extract_questions(FakeExtractLLM(), "x" * 300, k=5)
+    assert len(out) == 1
+    assert out[0]["category"] == "RAG"
+    assert out[0]["difficulty"] == "hard"
+    assert len(out[0]["rubric"]) >= 3
+
+
+def test_all_questions_includes_web_flag():
+    from interviewer import questions as q
+    curated = q.all_questions(include_web=False)
+    assert len(curated) == len(q.QUESTIONS)
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
