@@ -189,6 +189,50 @@ def test_prober_stops_on_nonanswer_and_stop_flag():
     assert Prober(StopLLM()).next_probe(q, [], "a real answer here", {}) is None
 
 
+def test_star_coach_scores_and_clamps():
+    from interviewer.star_coach import StarCoach
+
+    class FakeStarLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, system, user, temperature=0.2, retries=2):
+            return {"score": 99, "situation": 7, "task": 8, "action": 9, "result": 9,
+                    "missing": [], "feedback": "good", "improved_answer": "x",
+                    "follow_up": "y"}
+
+    c = StarCoach(FakeStarLLM())
+    r = c.evaluate("Tell me about a time...", "At my last role I owned X and shipped Y with 85% precision.")
+    assert r["score"] == 10  # clamped
+    for p in ("situation", "task", "action", "result"):
+        assert 0 <= r[p] <= 10
+
+
+def test_star_coach_empty_answer_zero():
+    from interviewer.star_coach import StarCoach
+
+    class FakeStarLLM:
+        backend = "fake"; model = "fake"
+        def chat_json(self, *a, **k):
+            return {}
+
+    r = StarCoach(FakeStarLLM()).evaluate("Q?", "")
+    assert r["score"] == 0
+    assert set(["Situation", "Task", "Action", "Result"]) <= set(r["missing"])
+
+
+def test_studysheet_aggregate():
+    from interviewer.studysheet import aggregate
+    sessions = [{"turns": [
+        {"category": "RAG", "score": 4, "missed": ["reranking", "eval"],
+         "ideal_answer": "use a reranker", "question": "design rag"},
+        {"category": "RAG", "score": 8, "missed": ["reranking"], "ideal_answer": "", "question": "q2"},
+        {"category": "Agents", "score": 9, "missed": [], "ideal_answer": "", "question": "q3"},
+    ]}]
+    cat_scores, cat_missed, cat_ideal, weak = aggregate(sessions)
+    assert round(sum(cat_scores["RAG"]) / len(cat_scores["RAG"]), 1) == 6.0
+    assert cat_missed["RAG"]["reranking"] == 2   # counted across turns
+    assert any(c == "RAG" for _, c, _, _ in weak)  # score<6 turn captured
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

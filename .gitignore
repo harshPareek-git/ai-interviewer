@@ -7,3 +7,5 @@ venv/
 sessions/*.json
 data/harvested_questions.json
 data/tailored_questions.json
+study_sheet.md
+sessions/behavioral_*.json

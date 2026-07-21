@@ -91,6 +91,30 @@ python -m interviewer.cli --with-tailored --web
 Answer prompts are multi-line: type your answer, then an empty line + Enter to
 submit. Type `skip` to skip a question.
 
+### STAR behavioral coach
+
+A dedicated behavioral round scored on the **STAR** framework (Situation, Task,
+Action, Result), the structure top companies expect. It flags which STAR parts
+you missed and rewrites a tighter version so you learn the shape of a great
+answer.
+
+```bash
+python -m interviewer.star            # 4 behavioral questions
+python -m interviewer.star --n 6 --voice
+```
+
+### Study-sheet export
+
+Turn your weak spots into a focused revision cheat-sheet. Reads all your past
+sessions, ranks your weakest categories, lists the rubric points you keep
+missing, synthesizes crisp revision notes, and collects the model answers you
+were shown.
+
+```bash
+python -m interviewer.studysheet              # -> study_sheet.md
+python -m interviewer.studysheet --no-llm     # faster, no synthesis
+```
+
 ## Better evaluation quality
 
 `llama3.2` (3B) works but is a lenient/rough judge. For sharper, more reliable
