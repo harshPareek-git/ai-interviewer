@@ -17,7 +17,7 @@ class LLM:
         self.backend = backend or os.getenv("INTERVIEWER_BACKEND", "ollama")
         self.model = model or os.getenv(
             "INTERVIEWER_MODEL",
-            "llama3.2:latest" if self.backend == "ollama" else "gpt-4o-mini",
+            "qwen2.5:7b" if self.backend == "ollama" else "gpt-4o-mini",
         )
         self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 

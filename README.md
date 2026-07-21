@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 # make sure Ollama is running with a model
 ollama serve
-ollama pull llama3.2          # works out of the box
+ollama pull qwen2.5:7b        # default judge model (recommended)
 
 # 1. harvest real interview questions from the web (India-focused)
 python -m interviewer.harvester --max-pages 6
@@ -117,12 +117,12 @@ python -m interviewer.studysheet --no-llm     # faster, no synthesis
 
 ## Better evaluation quality
 
-`llama3.2` (3B) works but is a lenient/rough judge. For sharper, more reliable
-scoring pull a stronger local model:
+The default judge is `qwen2.5:7b`, which scores well-calibrated (harsh on vague
+answers, fair on strong ones). A smaller model like `llama3.2` runs faster but
+is a more lenient judge:
 
 ```bash
-ollama pull qwen2.5:7b
-INTERVIEWER_MODEL=qwen2.5:7b python -m interviewer.cli
+INTERVIEWER_MODEL=llama3.2:latest python -m interviewer.cli   # faster, rougher
 ```
 
 Or use a hosted model:
