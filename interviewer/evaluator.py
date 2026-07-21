@@ -44,12 +44,14 @@ class Evaluator:
         self.llm = llm
 
     def evaluate(self, question: Dict, answer: str) -> Dict:
-        if not answer or len(answer.strip()) < 3:
+        a = (answer or "").strip()
+        if _is_non_answer(a):
             return {
                 "score": 0,
                 "covered": [], "missed": question["rubric"],
-                "strengths": "No answer provided.",
-                "gaps": "You skipped this question. Attempt an answer even if unsure.",
+                "strengths": "No real answer provided.",
+                "gaps": ("You didn't attempt this. In a real interview, say what you "
+                         "DO know and reason out loud, partial credit beats silence."),
                 "factual_errors": [],
                 "ideal_answer": self._quick_ideal(question),
                 "follow_up": "",
@@ -91,3 +93,16 @@ class Evaluator:
     @staticmethod
     def _quick_ideal(question: Dict) -> str:
         return "A strong answer would cover: " + "; ".join(question["rubric"]) + "."
+
+
+_NON_ANSWERS = {
+    "i don't know", "i dont know", "idk", "no idea", "not sure", "no clue",
+    "dunno", "pass", "skip", "n/a", "na", "no", "-",
+}
+
+
+def _is_non_answer(a: str) -> bool:
+    if len(a) < 3:
+        return True
+    norm = a.lower().strip().rstrip(".!?")
+    return norm in _NON_ANSWERS
